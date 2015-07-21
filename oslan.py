@@ -90,7 +90,7 @@ def scan_range(subnet):
             hostnam = socket.gethostbyaddr(ipstr)[0]
         except socket.herror as herr:
             sys.stderr.write("Unable to look up {}: \n".format(ipstr))
-            sys.stderr.write("{}\n".format(herr.msg))
+            sys.stderr.write("{}\n".format(herr.message))
             hostnam = ipstr
         try:
             reslist.append(Host(hostnam,
@@ -127,7 +127,7 @@ def scan_ip(ipaddr):
         hostnam = socket.gethostbyaddr(ipstr)[0]
     except socket.herror as herr:
         sys.stderr.write("Unable to look up {}: \n".format(ipstr))
-        sys.stderr.write("{}\n".format(herr.msg))
+        sys.stderr.write("{}\n".format(herr.message))
         hostnam = ipstr
 
     return [Host(hostnam, ipstr, nm[ipstr]['status']['state'],
