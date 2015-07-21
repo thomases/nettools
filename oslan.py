@@ -106,6 +106,14 @@ def scan_range(subnet):
 
 
 def scan_ip(ipaddr):
+    """
+    Scans a single ip
+
+    :param ipaddr: The IP address to scan
+    :type ipaddr: netaddr.IPAddress
+    :return: A list with a single namedtuple of type Host
+    :rtype: list
+    """
     try:
         nm = NM.PortScanner()
     except NM.PortScannerError as nmaperr:
