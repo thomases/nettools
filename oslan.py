@@ -34,20 +34,16 @@ def main():
 
     opts = parse_args()
     ipn = None
-
-    if not opts.iprange or opts.ip:
-        print "Iprange must be provided"
-        return 1
+    ip = None
+    result = None
 
     if opts.iprange:
         ipn = parse_ip_range(opts.iprange)
-        if not ipn:
-            return 1
+        result = scan_range(ipn)
     else:
-        # single ip adresses are not implemented (yet)
-        return 1
+        ip = parse_ip(opts.ip)
+        result = scan_ip(ip)
 
-    result = scan(ipn)
     if opts.search:
         mask = re.compile(opts.search, re.I)
         display([lst for lst in result if mask.search(lst.os)],
@@ -66,7 +62,7 @@ def display(lst, full):
             print "%s: %s" % (h.name, h.os)
 
 
-def scan(subnet):
+def scan_range(subnet):
     """Scan the subnet provided for OS fingerprints"""
     reslist = []
 
@@ -90,16 +86,12 @@ def scan(subnet):
 
         if nm[ipstr]['status']['state'] != 'up':
             continue
-            #if nm[ipstr].hostname() == '':
         try:
             hostnam = socket.gethostbyaddr(ipstr)[0]
         except socket.herror as herr:
             sys.stderr.write("Unable to look up {}: \n".format(ipstr))
             sys.stderr.write("{}\n".format(herr.msg))
             hostnam = ipstr
-            # hostnam = nm[ipstr].hostname()
-        # else:
-        #     hostnam = ipstr
         try:
             reslist.append(Host(hostnam,
                                 ipstr,
@@ -113,15 +105,57 @@ def scan(subnet):
     return reslist
 
 
+def scan_ip(ipaddr):
+    try:
+        nm = NM.PortScanner()
+    except NM.PortScannerError as nmaperr:
+        print dedent('''
+        Error initializing portscanner object: {}
+        Is namp installed?
+        ''').format(str(nmaperr)).strip()
+        sys.exit(69)  # nmap (possibly) unavailable
+
+    ipstr = str(ipaddr)
+    try:
+        nm.scan(ipstr, arguments='-O')
+    except NM.PortScannerError as scanerr:
+        sys.stderr.write(dedent('''
+        Caught PortScannerError on ip {}:
+        {}
+        ''').format(ipstr, scanerr.msg))
+    try:
+        hostnam = socket.gethostbyaddr(ipstr)[0]
+    except socket.herror as herr:
+        sys.stderr.write("Unable to look up {}: \n".format(ipstr))
+        sys.stderr.write("{}\n".format(herr.msg))
+        hostnam = ipstr
+
+    return [Host(hostnam, ipstr, nm[ipstr]['status']['state'],
+                 nm[ipstr]['osclass'][0]['osfamily'])]
+
+
 def parse_ip_range(iprange):
     """Parse an iprange into a subnet"""
     subnet = None
     try:
         subnet = NA.IPNetwork(iprange)
     except NA.AddrFormatError as err:
-        print "Caught exception" % err.message
+        print "Caught exception: " % err.message
         return None
     return subnet
+
+
+def parse_ip(ip):
+    ipadr = None
+    try:
+        if NA.valid_ipv4(ip) or NA.valid_ipv6(ip):
+            ipadr = NA.IPAddress(ip)
+            return ipadr
+        else:
+            raise NA.AddrFormatError
+    except NA.AddrFormatError as err:
+        print "Caught exception: " % err.message
+        raise
 
 
 def parse_args():
