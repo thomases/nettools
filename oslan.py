@@ -25,6 +25,8 @@ Host = namedtuple('Host', 'name ip state os')
 
 def main():
     """Main function"""
+    
+    opts = parse_args()
 
     if (os.geteuid() != 0):
         print dedent('''
@@ -33,7 +35,6 @@ def main():
         ''').strip()
         return posix.EX_NOPERM
 
-    opts = parse_args()
     ipn = None
     ip = None
     result = None
