@@ -25,7 +25,7 @@ Host = namedtuple('Host', 'name ip state os')
 
 def main():
     """Main function"""
-    
+
     opts = parse_args()
 
     if (os.geteuid() != 0):
@@ -68,34 +68,22 @@ def scan_range(subnet):
     """Scan the subnet provided for OS fingerprints"""
     reslist = []
 
-    try:
-        nm = NM.PortScanner()
-    except NM.PortScannerError as nmaperr:
-        print dedent('''
-        Error initializing portscanner object: {}
-        Is nmap installed?
-        ''').format(str(nmaperr)).strip()
-        sys.exit(posix.EX_UNAVAILABLE)  # nmap (possibly) unavailable
-
+    nm = make_scanner()
+    
     for ip in subnet.iter_hosts():
         ipstr = str(ip)
         try:
             nm.scan(ipstr, arguments='-O')
         except NM.PortScannerError as scanerr:
-            sys.stderr.write("Caught PortScannerError on ip {}: \n".format(ipstr))
+            sys.stderr.write(
+                "Caught PortScannerError on ip {}: \n".format(ipstr))
             sys.stderr.write("{}\n".format(scanerr.msg))
             continue
 
-        if not nm.all_hosts():
+        if not check_status():
             continue
-        
-        try:
-            hostnam = socket.gethostbyaddr(ipstr)[0]
-        except socket.herror as herr:
-            sys.stderr.write("Unable to look up {}: \n".format(ipstr))
-            sys.stderr.write("{}\n".format(herr.message))
-            hostnam = ipstr
 
+        hostnam = lookuphost(ipstr)
 
         try:
             state = nm[ipstr]['status']['state']
@@ -125,15 +113,9 @@ def scan_ip(ipaddr):
     for ip in ipaddr:
         nm = None
         osclass = ''
-        try:
-            nm = NM.PortScanner()
-        except NM.PortScannerError as nmaperr:
-            print dedent('''
-            Error initializing portscanner object: {}
-            Is nmap installed?
-            ''').format(str(nmaperr)).strip()
-            sys.exit(posix.EX_UNAVAILABLE)  # nmap (possibly) unavailable
 
+        nm = make_scanner()
+        
         ipstr = str(ip)
 
         try:
@@ -143,33 +125,95 @@ def scan_ip(ipaddr):
             Caught PortScannerError on ip {}:
             {}
             ''').format(ipstr, scanerr.msg))
-            
-        if not nm.all_hosts():
+
+        if not check_status(nm):
             continue
 
-        try:
-            hostnam = socket.gethostbyaddr(ipstr)[0]
-        except socket.herror as herr:
-            sys.stderr.write("Unable to look up {}: \n".format(ipstr))
-            sys.stderr.write("{}\n".format(herr.message))
-            hostnam = ipstr
 
-        try:
-            state = nm[ipstr]['status']['state']
-            try:
-                osclass = nm[ipstr]['osclass'][0]['osfamily']
-            except KeyError as __:
-                osclass = 'unknown'
-        except KeyError as __:
-            state = 'unknown'
+        hostnam = lookuphost(ipstr)
 
-
-        reslist.append(Host(hostnam,
-                            ipstr,
-                            state,
-                            osclass))
+        reslist.append(make_res_host(nm, hostnam, ipstr))
     return reslist
 
+
+def make_scanner():
+    """
+    Create a nmap.PortScanner object
+
+    :return: nmap.PortScanner object
+    :rtype: nmap.PortScanner
+    :raises: nmap.PortScannerError
+    """
+    try:
+        nm = NM.PortScanner()
+    except NM.PortScannerError as nmaperr:
+        print dedent('''
+        Error initializing portscanner object: {}
+        Is nmap installed?
+        ''').format(str(nmaperr)).strip()
+        raise
+    return nm
+
+
+def check_status(nm):
+    """
+    Check status of nmap scan
+
+    :param nm: nmap scan object
+    :type nm: nmap.PortScanner
+    :return: True if scan was ok, False otherwise
+    :rtype: bool
+    """
+    if nm.all_hosts():
+        return True
+    else:
+        return False
+
+
+def lookuphost(ip):
+    """
+    Lookup hostname from ip
+
+    Look up hostname from ip. Returns hostname if found, ip otherwise
+    
+    :param ip: The IP to look up
+    :type ip: str.
+    :return: hostname or ip
+    :rtype: str.
+    """
+    try:
+        hostnam = socket.gethostbyaddr(ip)[0]
+    except socket.herror as herr:
+        sys.stderr.write("Unable to look up {}: \n".format(ip))
+        sys.stderr.write("{}\n".format(herr.message))
+        hostnam = ip
+    return hostnam
+
+
+def make_res_host(nm, hnam, ip):
+    """
+    Extract information from nmap object and create Host tuple
+    
+    :param nm: nmap portscanner object
+    :type nm: nmap.PortScanner
+    :param hnam: hostname
+    :type hnam: str
+    :param ip: IP address
+    :type ip: str
+    :return: nametuple of type Host
+    :rtype: namedtuple
+    """
+    osclass = ''
+    try:
+        state = nm[ip]['status']['state']
+        try:
+            osclass = nm[ip]['osclass'][0]['osfamily']
+        except KeyError as __:
+            osclass = 'unknown'
+    except KeyError as __:
+        state = 'unknown'
+    return Host(hnam, ip, state, osclass)
+                
 
 def parse_ip_range(iprange):
     """Parse an iprange into a subnet"""
@@ -209,11 +253,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Find OS of hosts in subnet')
     parser.add_argument('-s', help="String to search for in resulting OS scan",
                         action="store", dest='search')
-    parser.add_argument('-F', help="Full listing of result, otherwise hostname and OS is displayed",
+    parser.add_argument('-F',
+                        help="Full listing of result, otherwise hostname and OS is displayed",
                         action="store_true", default=False, dest='full')
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-i', help="IP adress (not implemented yet)", 
+    group.add_argument('-i', help="IP adress (not implemented yet)",
                        action="store", nargs='+', dest='ip', default=[])
     group.add_argument('-r', help="IP adress or range", action="store",
                        dest='iprange')
