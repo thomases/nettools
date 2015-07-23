@@ -6,7 +6,7 @@
 
 """
 Scan a subnet for host and try to ascertain the OS
-of a particular host
+of a particular host or hosts
 """
 
 import sys
@@ -16,6 +16,7 @@ import nmap as NM
 import socket
 import re
 import os
+import posix
 from collections import namedtuple
 from textwrap import dedent
 
@@ -30,7 +31,7 @@ def main():
         This program performs OS finger printing via NMAP.
         To do this, root privileges (or sudo) are required.
         ''').strip()
-        return 77  # EX_NOPERM
+        return posix.EX_NOPERM
 
     opts = parse_args()
     ipn = None
@@ -73,7 +74,7 @@ def scan_range(subnet):
         Error initializing portscanner object: {}
         Is nmap installed?
         ''').format(str(nmaperr)).strip()
-        sys.exit(69)  # nmap (possibly) unavailable
+        sys.exit(posix.EX_UNAVAILABLE)  # nmap (possibly) unavailable
 
     for ip in subnet.iter_hosts():
         ipstr = str(ip)
@@ -84,62 +85,89 @@ def scan_range(subnet):
             sys.stderr.write("{}\n".format(scanerr.msg))
             continue
 
-        if nm[ipstr]['status']['state'] != 'up':
+        if not nm.all_hosts():
             continue
+        
         try:
             hostnam = socket.gethostbyaddr(ipstr)[0]
         except socket.herror as herr:
             sys.stderr.write("Unable to look up {}: \n".format(ipstr))
             sys.stderr.write("{}\n".format(herr.message))
             hostnam = ipstr
+
+
         try:
+            state = nm[ipstr]['status']['state']
+            osclass = nm[ipstr]['osclass'][0]['osfamily']
             reslist.append(Host(hostnam,
                                 ipstr,
-                                nm[ipstr]['status']['state'],
-                                nm[ipstr]['osclass'][0]['osfamily']))
+                                state,
+                                osclass))
         except KeyError as __:
             reslist.append(Host(hostnam,
                                 ipstr,
-                                nm[ipstr]['status']['state'],
+                                'unknown',
                                 'unknown'))
     return reslist
 
 
 def scan_ip(ipaddr):
     """
-    Scans a single ip
+    Scans a list of single IPs
 
-    :param ipaddr: The IP address to scan
-    :type ipaddr: netaddr.IPAddress
-    :return: A list with a single namedtuple of type Host
+    :param ipaddr: A list of IP addresses to scan
+    :type ipaddr: list
+    :return: A list with namedtuples of type Host
     :rtype: list
     """
-    try:
-        nm = NM.PortScanner()
-    except NM.PortScannerError as nmaperr:
-        print dedent('''
-        Error initializing portscanner object: {}
-        Is namp installed?
-        ''').format(str(nmaperr)).strip()
-        sys.exit(69)  # nmap (possibly) unavailable
+    reslist = []
+    for ip in ipaddr:
+        nm = None
+        osclass = ''
+        try:
+            nm = NM.PortScanner()
+        except NM.PortScannerError as nmaperr:
+            print dedent('''
+            Error initializing portscanner object: {}
+            Is nmap installed?
+            ''').format(str(nmaperr)).strip()
+            sys.exit(posix.EX_UNAVAILABLE)  # nmap (possibly) unavailable
 
-    ipstr = str(ipaddr)
-    try:
-        nm.scan(ipstr, arguments='-O')
-    except NM.PortScannerError as scanerr:
-        sys.stderr.write(dedent('''
-        Caught PortScannerError on ip {}:
-        {}
-        ''').format(ipstr, scanerr.msg))
-    try:
-        hostnam = socket.gethostbyaddr(ipstr)[0]
-    except socket.herror as herr:
-        sys.stderr.write("Unable to look up {}: \n".format(ipstr))
-        sys.stderr.write("{}\n".format(herr.message))
-        hostnam = ipstr
+        ipstr = str(ip)
 
-    return [Host(hostnam, ipstr, nm[ipstr]['status']['state'],
-                 nm[ipstr]['osclass'][0]['osfamily'])]
+        try:
+            nm.scan(ipstr, arguments='-O')
+        except NM.PortScannerError as scanerr:
+            sys.stderr.write(dedent('''
+            Caught PortScannerError on ip {}:
+            {}
+            ''').format(ipstr, scanerr.msg))
+            
+        if not nm.all_hosts():
+            continue
+
+        try:
+            hostnam = socket.gethostbyaddr(ipstr)[0]
+        except socket.herror as herr:
+            sys.stderr.write("Unable to look up {}: \n".format(ipstr))
+            sys.stderr.write("{}\n".format(herr.message))
+            hostnam = ipstr
+
+        try:
+            state = nm[ipstr]['status']['state']
+            try:
+                osclass = nm[ipstr]['osclass'][0]['osfamily']
+            except KeyError as __:
+                osclass = 'unknown'
+        except KeyError as __:
+            state = 'unknown'
+
+
+        reslist.append(Host(hostnam,
+                            ipstr,
+                            state,
+                            osclass))
+    return reslist
 
 
 def parse_ip_range(iprange):
@@ -154,28 +182,40 @@ def parse_ip_range(iprange):
 
 
 def parse_ip(ip):
-    ipadr = None
-    try:
-        if NA.valid_ipv4(ip) or NA.valid_ipv6(ip):
-            ipadr = NA.IPAddress(ip)
-            return ipadr
-        else:
-            raise NA.AddrFormatError
-    except NA.AddrFormatError as err:
-        print "Caught exception: " % err.message
-        raise
+    """
+    Parse a list of IPs into netaddr.IPAddress objects
+
+    :param str ip: A string of IPs, separated by commas
+    :raises: netaddr.AddrFormatError on malformed IPs
+    :return: A list of netaddr.IPAddress objects
+    :rtype: list
+    """
+    iplist = []
+    for ipt in ip:
+        try:
+            if NA.valid_ipv4(ipt) or NA.valid_ipv6(ipt):
+                iplist.append(NA.IPAddress(ipt))
+            else:
+                raise NA.AddrFormatError
+        except NA.AddrFormatError as err:
+            print "Caught exception: {}".format(err.message)
+            raise
+    return iplist
 
 
 def parse_args():
     """Parse options and return the resulting object"""
     parser = argparse.ArgumentParser(description='Find OS of hosts in subnet')
-    parser.add_argument('-s', help="String to search for in resulting OS scan", action="store", dest='search')
+    parser.add_argument('-s', help="String to search for in resulting OS scan",
+                        action="store", dest='search')
     parser.add_argument('-F', help="Full listing of result, otherwise hostname and OS is displayed",
                         action="store_true", default=False, dest='full')
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('-i', help="IP adress (not implemented yet)", action="store", dest='ip')
-    group.add_argument('-r', help="IP adress or range", action="store", dest='iprange')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-i', help="IP adress (not implemented yet)", 
+                       action="store", nargs='+', dest='ip', default=[])
+    group.add_argument('-r', help="IP adress or range", action="store",
+                       dest='iprange')
 
     return parser.parse_args()
 
