@@ -69,7 +69,7 @@ def scan_range(subnet):
     reslist = []
 
     nm = make_scanner()
-    
+
     for ip in subnet.iter_hosts():
         ipstr = str(ip)
         try:
@@ -115,7 +115,7 @@ def scan_ip(ipaddr):
         osclass = ''
 
         nm = make_scanner()
-        
+
         ipstr = str(ip)
 
         try:
@@ -128,7 +128,6 @@ def scan_ip(ipaddr):
 
         if not check_status(nm):
             continue
-
 
         hostnam = lookuphost(ipstr)
 
@@ -172,10 +171,8 @@ def check_status(nm):
 
 def lookuphost(ip):
     """
-    Lookup hostname from ip
-
     Look up hostname from ip. Returns hostname if found, ip otherwise
-    
+
     :param ip: The IP to look up
     :type ip: str.
     :return: hostname or ip
@@ -193,7 +190,7 @@ def lookuphost(ip):
 def make_res_host(nm, hnam, ip):
     """
     Extract information from nmap object and create Host tuple
-    
+
     :param nm: nmap portscanner object
     :type nm: nmap.PortScanner
     :param hnam: hostname
@@ -213,7 +210,7 @@ def make_res_host(nm, hnam, ip):
     except KeyError as __:
         state = 'unknown'
     return Host(hnam, ip, state, osclass)
-                
+
 
 def parse_ip_range(iprange):
     """Parse an iprange into a subnet"""
