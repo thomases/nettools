@@ -24,7 +24,12 @@ Host = namedtuple('Host', 'name ip state os')
 
 
 def main():
-    """Main function"""
+    """
+    Main function
+    
+    :return: Exit value of program
+    :rtype: int
+    """
 
     opts = parse_args()
 
@@ -52,10 +57,18 @@ def main():
                 opts.full)
     else:
         display(result, opts.full)
+    return 0
 
 
 def display(lst, full):
-    """Display the result on screen"""
+    """
+    Display the result on screen
+
+    :param lst: A list of namedtuples
+    :type lst: list
+    :param full: display full information or not
+    :type full: bool
+    """
     if full:
         for h in lst:
             print "%s (%s): %s" % (h.name, h.ip, h.os)
@@ -65,7 +78,14 @@ def display(lst, full):
 
 
 def scan_range(subnet):
-    """Scan the subnet provided for OS fingerprints"""
+    """
+    Scan the subnet provided for OS fingerprints
+    
+    :param subnet: a subnet object
+    :type subnet: netaddr.IPNetwork
+    :return: A list of active hosts
+    :rtype: list
+    """
     reslist = []
 
     nm = make_scanner()
@@ -92,7 +112,7 @@ def scan_range(subnet):
 
 def scan_ip(ipaddr):
     """
-    Scans a list of single IPs
+    Scans a list of IPs for OS fingerprints
 
     :param ipaddr: A list of IP addresses to scan
     :type ipaddr: list
@@ -203,7 +223,14 @@ def make_res_host(nm, hnam, ip):
 
 
 def parse_ip_range(iprange):
-    """Parse an iprange into a subnet"""
+    """
+    Parse an iprange into a subnet
+    
+    :param iprange: The IP range to parse
+    :type iprange: str
+    :return: An object representing a subnet
+    :rtype: netaddr.IPNetwork
+    """
     subnet = None
     try:
         subnet = NA.IPNetwork(iprange)
@@ -236,7 +263,9 @@ def parse_ip(ip):
 
 
 def parse_args():
-    """Parse options and return the resulting object"""
+    """
+    Parse options and return the resulting object
+    """
     parser = argparse.ArgumentParser(description='Find OS of hosts in subnet')
     parser.add_argument('-s', help="String to search for in resulting OS scan",
                         action="store", dest='search')
