@@ -86,7 +86,7 @@ def scan_range(subnet):
         hostnam = lookuphost(ipstr)
 
         reslist.append(make_res_host(nm, hostnam, ipstr))
-        
+
     return reslist
 
 
@@ -100,13 +100,11 @@ def scan_ip(ipaddr):
     :rtype: list
     """
     reslist = []
-    
-    nm = make_scanner()
-    
-    for ip in ipaddr:
-        nm = None
-        osclass = ''
 
+    nm = make_scanner()
+
+    for ip in ipaddr:
+        osclass = ''
 
         ipstr = str(ip)
 
@@ -122,7 +120,7 @@ def scan_ip(ipaddr):
             continue
 
         hostnam = lookuphost(ipstr)
-    
+
         reslist.append(make_res_host(nm, hostnam, ipstr))
     return reslist
 
