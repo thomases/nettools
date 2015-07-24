@@ -80,23 +80,13 @@ def scan_range(subnet):
             sys.stderr.write("{}\n".format(scanerr.msg))
             continue
 
-        if not check_status():
+        if not check_status(nm):
             continue
 
         hostnam = lookuphost(ipstr)
 
-        try:
-            state = nm[ipstr]['status']['state']
-            osclass = nm[ipstr]['osclass'][0]['osfamily']
-            reslist.append(Host(hostnam,
-                                ipstr,
-                                state,
-                                osclass))
-        except KeyError as __:
-            reslist.append(Host(hostnam,
-                                ipstr,
-                                'unknown',
-                                'unknown'))
+        reslist.append(make_res_host(nm, hostnam, ipstr))
+        
     return reslist
 
 
@@ -110,11 +100,13 @@ def scan_ip(ipaddr):
     :rtype: list
     """
     reslist = []
+    
+    nm = make_scanner()
+    
     for ip in ipaddr:
         nm = None
         osclass = ''
 
-        nm = make_scanner()
 
         ipstr = str(ip)
 
@@ -130,7 +122,7 @@ def scan_ip(ipaddr):
             continue
 
         hostnam = lookuphost(ipstr)
-
+    
         reslist.append(make_res_host(nm, hostnam, ipstr))
     return reslist
 
