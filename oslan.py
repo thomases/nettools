@@ -89,23 +89,23 @@ def scan_range(subnet):
     reslist = []
 
     nm = make_scanner()
+    for sb in subnet:
+        for ip in sb.iter_hosts():
+            ipstr = str(ip)
+            try:
+                nm.scan(ipstr, arguments='-O')
+            except NM.PortScannerError as scanerr:
+                sys.stderr.write(
+                    "Caught PortScannerError on ip {}: \n".format(ipstr))
+                sys.stderr.write("{}\n".format(scanerr.msg))
+                continue
+            
+            if not check_status(nm):
+                continue
 
-    for ip in subnet.iter_hosts():
-        ipstr = str(ip)
-        try:
-            nm.scan(ipstr, arguments='-O')
-        except NM.PortScannerError as scanerr:
-            sys.stderr.write(
-                "Caught PortScannerError on ip {}: \n".format(ipstr))
-            sys.stderr.write("{}\n".format(scanerr.msg))
-            continue
+            hostnam = lookuphost(ipstr)
 
-        if not check_status(nm):
-            continue
-
-        hostnam = lookuphost(ipstr)
-
-        reslist.append(make_res_host(nm, hostnam, ipstr))
+            reslist.append(make_res_host(nm, hostnam, ipstr))
 
     return reslist
 
@@ -224,20 +224,23 @@ def make_res_host(nm, hnam, ip):
 
 def parse_ip_range(iprange):
     """
-    Parse an iprange into a subnet
+    Parse a list of ipranges into subnets
     
     :param iprange: The IP range to parse
-    :type iprange: str
-    :return: An object representing a subnet
-    :rtype: netaddr.IPNetwork
+    :type iprange: list
+    :return: An list representing subnets 
+    :rtype: list
     """
-    subnet = None
-    try:
-        subnet = NA.IPNetwork(iprange)
-    except NA.AddrFormatError as err:
-        print "Caught exception: " % err.message
-        return None
-    return subnet
+    subnetlist = []
+
+    for sb in iprange:
+        try:
+            subnet = NA.IPNetwork(sb)
+        except NA.AddrFormatError as err:
+            print "Caught exception: " % err.message
+            continue
+        subnetlist.append(subnet)
+    return subnetlist
 
 
 def parse_ip(ip):
@@ -274,10 +277,10 @@ def parse_args():
                         action="store_true", default=False, dest='full')
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-i', help="IP adress (not implemented yet)",
+    group.add_argument('-i', help="IP address",
                        action="store", nargs='+', dest='ip', default=[])
-    group.add_argument('-r', help="IP adress or range", action="store",
-                       dest='iprange')
+    group.add_argument('-r', help="IP range (subnet)", action="store",
+                       nargs='+', dest='iprange', default=[])
 
     return parser.parse_args()
 
