@@ -97,7 +97,7 @@ def scan_range(subnet):
             except NM.PortScannerError as scanerr:
                 sys.stderr.write(
                     "Caught PortScannerError on ip {}: \n".format(ipstr))
-                sys.stderr.write("{}\n".format(scanerr.msg))
+                sys.stderr.write("{}\n".format(scanerr.message))
                 continue
             
             if not check_status(nm):
@@ -134,7 +134,7 @@ def scan_ip(ipaddr):
             sys.stderr.write(dedent('''
             Caught PortScannerError on ip {}:
             {}
-            ''').format(ipstr, scanerr.msg))
+            ''').format(ipstr, scanerr.message))
 
         if not check_status(nm):
             continue
