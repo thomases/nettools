@@ -1,7 +1,5 @@
 #! /usr/bin/perl -w
 #
-#   $Id$
-#
 # Copyright (C) 2015 by Thomas Hemmingby Espe <thomas.espe@gmail.com>
 #
 
@@ -12,11 +10,10 @@ use Getopt::Std;
 use Net::MAC;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-
 $main::VERSION = '0.01';
 
+# options processing
 my %opts;
-
 getopts('d', \%opts);
 
 
@@ -24,9 +21,10 @@ getopts('d', \%opts);
 my $mac = Net::MAC->new('mac' => $ARGV[0]);
 
 if ($opts{'d'}) {
-    
+    # print mac in format suitable for dhcpd hardware ethernet declarations
     print $mac->convert('delimiter' => ':') ."\n";
 }
+
 
 sub HELP_MESSAGE () {
     print <<EOF
